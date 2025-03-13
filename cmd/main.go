@@ -2,29 +2,46 @@ package main
 
 import (
 	"go-backend/db"
-	"go-backend/src/models"
+	"go-backend/src/handlers/routes" // Import DTO untuk validasi
 	"log"
+
+	_ "go-backend/docs"
+
+	"github.com/go-playground/validator/v10"
+	"github.com/labstack/echo/v4"
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
+// CustomValidator untuk Echo
+type CustomValidator struct {
+	validator *validator.Validate
+}
+
+// Implementasi metode Validate untuk Echo
+func (cv *CustomValidator) Validate(i interface{}) error {
+	return cv.validator.Struct(i)
+}
+
+// @title Go Backend Test
+// @version 1.0
+// @description Test for managing accounts & transactions service.
+// @host localhost:8080
+// @BasePath /api/v1
 func main() {
+	log.SetFlags(0) // Disable timestamp buffering
 	db.ConnectDB()
 
-	db.DB.Exec(`DO $$ BEGIN 
-		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'account_type_enum') THEN 
-			CREATE TYPE account_type_enum AS ENUM ('savings', 'checking', 'deposit'); 
-		END IF;
-	END $$;`)
+	e := echo.New()
 
-	db.DB.Exec(`DO $$ BEGIN 
-		IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'transaction_type_enum') THEN 
-			CREATE TYPE transaction_type_enum AS ENUM ('deposit', 'withdraw'); 
-		END IF;
-	END $$;`)
+	// Daftarkan Validator ke Echo
+	e.Validator = &CustomValidator{validator: validator.New()}
 
-	err := db.DB.AutoMigrate(&models.Customer{}, &models.Account{}, &models.Transaction{}, &models.AuditLog{})
-	if err != nil {
-		log.Fatal("Migration failed:", err)
-	}
+	// Rute Swagger
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
-	log.Println("Migration completed successfully")
+	// Daftarkan Rute API
+	routes.RegisterRoutes(e)
+
+	log.Println("Server running on port 8080")
+	e.Logger.Fatal(e.Start(":8080"))
 }

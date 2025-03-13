@@ -19,4 +19,7 @@ type Account struct {
 	AccountType AccountType `gorm:"type:account_type_enum;not null"`
 	Balance     float64     `gorm:"default:0"`
 	CreatedAt   time.Time   `gorm:"autoCreateTime"`
+
+	// relasi table
+	Customer Customer `gorm:"foreignKey:CustomerID;constraint:OnDelete:CASCADE"`
 }
