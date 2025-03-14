@@ -1,0 +1,37 @@
+services:
+  # Service Account (Go service)
+  account-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"  # Mapping port 8080 di host ke port 8080 di container
+    environment:
+      - DB_HOST=db  # Host database, sesuai dengan nama service database di bawah
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=ncnc1234
+      - DB_NAME=go-backend
+    depends_on:
+      - db  # Service account-service menunggu database siap sebelum dijalankan
+    networks:
+      - app-network
+
+  # Database (PostgreSQL)
+  db:
+    image: postgres:13-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_DB=accountdb
+    volumes:
+      - postgres-data:/var/lib/postgresql/data  # Menyimpan data database secara persisten
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
