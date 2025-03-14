@@ -4,7 +4,7 @@ type RegisterRequest struct {
 	Nama        string `json:"nama" validate:"required"`
 	NIK         string `json:"nik" validate:"required,len=16"`
 	NoHP        string `json:"no_hp" validate:"required"`
-	AccountType string `json:"account_type" validate:"required,oneof=savings checking deposit"`
+	AccountType string `json:"account_type" binding:"required,oneof=savings giro"`
 }
 
 type RegisterResponse struct {

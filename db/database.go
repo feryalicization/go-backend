@@ -2,34 +2,28 @@ package db
 
 import (
 	"fmt"
-	"log"
+
+	"go-backend/config"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-
-	"go-backend/config"
 )
 
 var DB *gorm.DB
 
-func ConnectDB() {
+func ConnectDB() error {
 	cfg := config.LoadConfig()
-
-	// Debug: Print Config
-	fmt.Printf("Config Loaded: %+v\n", cfg)
-
 	dsn := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBSSLMode,
 	)
 
-	fmt.Println("Connecting to DB with DSN:", dsn) // Debug
-
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	log.Println("Connected to database successfully")
+	fmt.Println("Connected to database successfully")
+	return nil
 }

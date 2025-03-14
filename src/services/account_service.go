@@ -4,25 +4,29 @@ import (
 	"errors"
 	"fmt"
 	"go-backend/db"
+	"go-backend/logs"
 	"go-backend/src/models"
-	"log"
 	"math/rand"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
 func RegisterNasabahService(name, nik, phone, accountType string) (string, error) {
-	// Validasi jenis akun
-	validTypes := map[string]models.AccountType{
-		"savings":  models.Savings,
-		"checking": models.Checking,
-		"deposit":  models.Deposits,
+	// Validasi jenis akun menggunakan constant dari models
+	validAccountTypes := map[string]bool{
+		models.Savings: true,
+		models.Giro:    true,
 	}
 
-	accType, exists := validTypes[accountType]
-	if !exists {
-		log.Println("[ERROR] Jenis akun tidak valid:", accountType)
-		return "", errors.New("jenis akun tidak valid, gunakan: savings, checking, atau deposit")
+	if !validAccountTypes[accountType] {
+		message := "Jenis akun tidak valid"
+		logData := logrus.Fields{"account_type": accountType}
+
+		logs.LogError(nik, message, logData)
+		logs.StoreLogEntry(nik, message, "WARNING", logData)
+
+		return "", errors.New("jenis akun tidak valid, gunakan: savings atau giro")
 	}
 
 	// Cari Customer berdasarkan NIK
@@ -30,42 +34,66 @@ func RegisterNasabahService(name, nik, phone, accountType string) (string, error
 	err := db.DB.Where("nik = ?", nik).First(&existingCustomer).Error
 
 	if err != nil && err != gorm.ErrRecordNotFound {
-		log.Println("[ERROR] Database query failed:", err)
+		message := "Database query failed"
+		logData := logrus.Fields{"error": err.Error(), "nik": nik}
+
+		logs.LogError(nik, message, logData)
+		logs.StoreLogEntry(nik, message, "ERROR", logData)
+
 		return "", errors.New("database error")
 	}
 
 	// Jika NIK sudah ada, periksa apakah sudah memiliki akun dengan jenis yang sama
 	if err == nil {
 		var existingAccount models.Account
-		err = db.DB.Where("customer_id = ? AND account_type = ?", existingCustomer.ID, accType).First(&existingAccount).Error
+		err = db.DB.Where("customer_id = ? AND account_type = ?", existingCustomer.ID, accountType).First(&existingAccount).Error
 		if err == nil {
-			log.Println("[INFO] Customer dengan NIK ini sudah memiliki akun jenis:", accountType)
-			return "", errors.New("customer dengan NIK ini sudah memiliki akun jenis " + accountType)
+			message := "Customer sudah memiliki akun dengan jenis yang sama"
+			logData := logrus.Fields{"nik": nik, "account_type": accountType}
+
+			logs.LogInfo(nik, message, logData)
+			logs.StoreLogEntry(nik, message, "WARNING", logData)
+
+			return "", errors.New(message)
 		}
 
 		// Cek apakah nomor HP sudah digunakan oleh NIK lain
 		var phoneCheck models.Customer
 		err = db.DB.Where("phone = ? AND nik != ?", phone, nik).First(&phoneCheck).Error
 		if err == nil {
-			log.Println("[INFO] No HP sudah digunakan oleh NIK lain:", phone)
-			return "", errors.New("No HP sudah digunakan oleh pengguna lain")
+			message := "No HP sudah digunakan oleh pengguna lain"
+			logData := logrus.Fields{"nik": nik, "phone": phone}
+
+			logs.LogInfo(nik, message, logData)
+			logs.StoreLogEntry(nik, message, "WARNING", logData)
+
+			return "", errors.New(message)
 		}
 
 		// Buat akun baru dengan jenis akun yang diinginkan
 		newAccount := models.Account{
 			CustomerID:  existingCustomer.ID,
 			AccountNo:   GenerateAccountNumber(),
-			AccountType: accType,
+			AccountType: accountType,
 			Balance:     0.0,
 		}
 
-		log.Printf("[DEBUG] Menyimpan akun baru untuk customer: %+v\n", newAccount)
 		if err := db.DB.Create(&newAccount).Error; err != nil {
-			log.Println("[ERROR] Gagal registrasi akun:", err)
-			return "", errors.New("gagal registrasi akun")
+			message := "Gagal registrasi akun"
+			logData := logrus.Fields{"nik": nik, "account_type": accountType, "error": err.Error()}
+
+			logs.LogError(nik, message, logData)
+			logs.StoreLogEntry(nik, message, "ERROR", logData)
+
+			return "", errors.New(message)
 		}
 
-		log.Println("[INFO] Akun berhasil dibuat dengan No Rekening:", newAccount.AccountNo)
+		message := "Akun berhasil dibuat"
+		logData := logrus.Fields{"nik": nik, "account_no": newAccount.AccountNo, "account_type": accountType}
+
+		logs.LogInfo(nik, message, logData)
+		logs.StoreLogEntry(nik, message, "INFO", logData)
+
 		return newAccount.AccountNo, nil
 	}
 
@@ -76,29 +104,46 @@ func RegisterNasabahService(name, nik, phone, accountType string) (string, error
 		Phone: phone,
 	}
 
-	log.Printf("[DEBUG] Menyimpan nasabah baru: %+v\n", newCustomer)
 	if err := db.DB.Create(&newCustomer).Error; err != nil {
-		log.Println("[ERROR] Gagal menyimpan data nasabah:", err)
-		return "", errors.New("gagal menyimpan data nasabah")
+		message := "Gagal menyimpan data nasabah"
+		logData := logrus.Fields{"nik": nik, "error": err.Error()}
+
+		logs.LogError(nik, message, logData)
+		logs.StoreLogEntry(nik, message, "ERROR", logData)
+
+		return "", errors.New(message)
 	}
 
-	log.Println("[INFO] Nasabah berhasil disimpan dengan ID:", newCustomer.ID)
-
-	// save to db
+	// Buat akun pertama untuk customer baru
 	newAccount := models.Account{
 		CustomerID:  newCustomer.ID,
 		AccountNo:   GenerateAccountNumber(),
-		AccountType: accType,
+		AccountType: accountType,
 		Balance:     0.0,
 	}
 
-	log.Printf("[DEBUG] Menyimpan akun pertama: %+v\n", newAccount)
 	if err := db.DB.Create(&newAccount).Error; err != nil {
-		log.Println("[ERROR] Gagal registrasi akun:", err)
-		return "", errors.New("gagal registrasi akun")
+		message := "Gagal registrasi akun"
+		logData := logrus.Fields{"nik": nik, "account_type": accountType, "error": err.Error()}
+
+		logs.LogError(nik, message, logData)
+		logs.StoreLogEntry(nik, message, "ERROR", logData)
+
+		return "", errors.New(message)
 	}
 
-	log.Println("[INFO] Akun berhasil dibuat dengan No Rekening:", newAccount.AccountNo)
+	message := "Nasabah baru dan akun berhasil dibuat"
+	logData := logrus.Fields{
+		"nik":          nik,
+		"name":         name,
+		"phone":        phone,
+		"account_no":   newAccount.AccountNo,
+		"account_type": accountType,
+	}
+
+	logs.LogInfo(nik, message, logData)
+	logs.StoreLogEntry(nik, message, "INFO", logData)
+
 	return newAccount.AccountNo, nil
 }
 
