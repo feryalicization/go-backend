@@ -1,8 +1,13 @@
 {
     "swagger": "2.0",
     "info": {
-        "contact": {}
+        "description": "Test for managing accounts \u0026 transactions service.",
+        "title": "Go Backend Test",
+        "contact": {},
+        "version": "1.0"
     },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
     "paths": {
         "/daftar": {
             "post": {

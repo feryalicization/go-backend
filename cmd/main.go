@@ -9,15 +9,16 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
+	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
-// CustomValidator untuk Echo
+// CustomValidator for Echo
 type CustomValidator struct {
 	validator *validator.Validate
 }
 
-// Implementasi metode Validate untuk Echo
+// Validate method for Echo
 func (cv *CustomValidator) Validate(i interface{}) error {
 	return cv.validator.Struct(i)
 }
@@ -33,13 +34,19 @@ func main() {
 
 	e := echo.New()
 
-	// Daftarkan Validator ke Echo
+	// Register Validator
 	e.Validator = &CustomValidator{validator: validator.New()}
 
-	// Swagger Reoute
+	// CORS Middleware
+	e.Use(echoMiddleware.CORSWithConfig(echoMiddleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{echo.GET, echo.POST, echo.PUT, echo.DELETE},
+	}))
+
+	// Swagger Route
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
-	// Insert All Route
+	// Register All Routes
 	routes.RegisterRoutes(e)
 
 	log.Println("Server running on port 8080")

@@ -1,3 +1,4 @@
+basePath: /api/v1
 definitions:
   dto.DepositRequest:
     properties:
@@ -69,8 +70,12 @@ definitions:
       saldo:
         type: number
     type: object
+host: localhost:8080
 info:
   contact: {}
+  description: Test for managing accounts & transactions service.
+  title: Go Backend Test
+  version: "1.0"
 paths:
   /daftar:
     post:
