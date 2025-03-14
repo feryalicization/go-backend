@@ -1,12 +1,31 @@
 basePath: /api/v1
 definitions:
+  dto.DepositRequest:
+    properties:
+      no_rekening:
+        type: string
+      nominal:
+        type: number
+    required:
+    - no_rekening
+    - nominal
+    type: object
+  dto.DepositResponse:
+    properties:
+      saldo:
+        type: number
+    type: object
+  dto.ErrorResponse:
+    properties:
+      remark:
+        type: string
+    type: object
   dto.RegisterRequest:
     properties:
       account_type:
         enum:
         - savings
-        - checking
-        - deposit
+        - giro
         type: string
       nama:
         type: string
@@ -26,6 +45,30 @@ definitions:
         type: string
       remark:
         type: string
+    type: object
+  dto.SaldoResponse:
+    properties:
+      remark:
+        type: string
+      saldo:
+        type: number
+    type: object
+  dto.WithdrawRequest:
+    properties:
+      no_rekening:
+        type: string
+      nominal:
+        type: number
+    required:
+    - no_rekening
+    - nominal
+    type: object
+  dto.WithdrawResponse:
+    properties:
+      remark:
+        type: string
+      saldo:
+        type: number
     type: object
 host: localhost:8080
 info:
@@ -64,4 +107,89 @@ paths:
       summary: Register new nasabah
       tags:
       - accounts
+  /saldo/{no_rekening}:
+    get:
+      consumes:
+      - application/json
+      description: Melihat saldo nasabah berdasarkan nomor rekening
+      parameters:
+      - description: Nomor Rekening
+        in: path
+        name: no_rekening
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SaldoResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.SaldoResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.SaldoResponse'
+      summary: Get account balance
+      tags:
+      - accounts
+  /tabung:
+    post:
+      consumes:
+      - application/json
+      description: Menyetor saldo ke akun berdasarkan nomor rekening
+      parameters:
+      - description: Request Body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.DepositRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DepositResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Deposit saldo ke akun nasabah
+      tags:
+      - transactions
+  /tarik:
+    post:
+      consumes:
+      - application/json
+      description: Menarik dana dari rekening tabungan
+      parameters:
+      - description: Request Body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.WithdrawRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.WithdrawResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.WithdrawResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.WithdrawResponse'
+      summary: Withdraw money from an account
+      tags:
+      - transactions
 swagger: "2.0"

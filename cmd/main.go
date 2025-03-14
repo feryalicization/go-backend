@@ -36,10 +36,10 @@ func main() {
 	// Daftarkan Validator ke Echo
 	e.Validator = &CustomValidator{validator: validator.New()}
 
-	// Rute Swagger
+	// Swagger Reoute
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 
-	// Daftarkan Rute API
+	// Insert All Route
 	routes.RegisterRoutes(e)
 
 	log.Println("Server running on port 8080")

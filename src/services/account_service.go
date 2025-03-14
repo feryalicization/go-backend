@@ -12,17 +12,15 @@ import (
 )
 
 func RegisterNasabahService(name, nik, phone, accountType string) (string, error) {
-	// Validasi jenis akun
-	validTypes := map[string]models.AccountType{
-		"savings":  models.Savings,
-		"checking": models.Checking,
-		"deposit":  models.Deposits,
+	// Validasi jenis akun menggunakan constant dari models
+	validAccountTypes := map[string]bool{
+		models.Savings: true,
+		models.Giro:    true,
 	}
 
-	accType, exists := validTypes[accountType]
-	if !exists {
+	if !validAccountTypes[accountType] {
 		log.Println("[ERROR] Jenis akun tidak valid:", accountType)
-		return "", errors.New("jenis akun tidak valid, gunakan: savings, checking, atau deposit")
+		return "", errors.New("jenis akun tidak valid, gunakan: savings atau giro")
 	}
 
 	// Cari Customer berdasarkan NIK
@@ -37,7 +35,7 @@ func RegisterNasabahService(name, nik, phone, accountType string) (string, error
 	// Jika NIK sudah ada, periksa apakah sudah memiliki akun dengan jenis yang sama
 	if err == nil {
 		var existingAccount models.Account
-		err = db.DB.Where("customer_id = ? AND account_type = ?", existingCustomer.ID, accType).First(&existingAccount).Error
+		err = db.DB.Where("customer_id = ? AND account_type = ?", existingCustomer.ID, accountType).First(&existingAccount).Error
 		if err == nil {
 			log.Println("[INFO] Customer dengan NIK ini sudah memiliki akun jenis:", accountType)
 			return "", errors.New("customer dengan NIK ini sudah memiliki akun jenis " + accountType)
@@ -55,7 +53,7 @@ func RegisterNasabahService(name, nik, phone, accountType string) (string, error
 		newAccount := models.Account{
 			CustomerID:  existingCustomer.ID,
 			AccountNo:   GenerateAccountNumber(),
-			AccountType: accType,
+			AccountType: accountType,
 			Balance:     0.0,
 		}
 
@@ -88,7 +86,7 @@ func RegisterNasabahService(name, nik, phone, accountType string) (string, error
 	newAccount := models.Account{
 		CustomerID:  newCustomer.ID,
 		AccountNo:   GenerateAccountNumber(),
-		AccountType: accType,
+		AccountType: accountType,
 		Balance:     0.0,
 	}
 
