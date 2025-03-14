@@ -14,6 +14,7 @@ func main() {
 		&models.Account{},
 		&models.Transaction{},
 		&models.AuditLog{},
+		&models.LogEntry{},
 	)
 	if err != nil {
 		log.Fatal("Migration failed:", err)

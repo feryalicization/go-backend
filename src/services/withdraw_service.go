@@ -3,36 +3,72 @@ package services
 import (
 	"errors"
 	"go-backend/db"
+	"go-backend/logs"
 	"go-backend/src/models"
-	"log"
 
 	"gorm.io/gorm"
 )
 
 func WithdrawService(accountNo string, amount float64) (float64, error) {
+	// Validasi jumlah penarikan
+	if amount <= 0 {
+		message := "Jumlah penarikan harus lebih dari 0"
+		logData := map[string]interface{}{
+			"accountNo": accountNo,
+			"amount":    amount,
+		}
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "WARNING", logData)
+		return 0, errors.New(message)
+	}
+
 	var account models.Account
 
+	// Cari akun berdasarkan nomor rekening dan tipe akun savings
 	err := db.DB.Where("account_no = ? AND account_type = ?", accountNo, models.Savings).First(&account).Error
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Println("[ERROR] No rekening tidak ditemukan atau bukan akun savings:", accountNo)
-			return 0, errors.New("no rekening tidak ditemukan atau bukan akun savings")
+		message := "No rekening tidak ditemukan atau bukan akun savings"
+		logData := map[string]interface{}{
+			"accountNo": accountNo,
+			"error":     err.Error(),
 		}
-		log.Println("[ERROR] Database query error:", err)
-		return 0, errors.New("terjadi kesalahan database")
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logs.LogError(accountNo, message, logData)
+			logs.StoreLogEntry(accountNo, message, "WARNING", logData)
+			return 0, errors.New(message)
+		}
+
+		message = "Terjadi kesalahan database"
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "ERROR", logData)
+		return 0, errors.New(message)
 	}
 
-	// Cek apakah saldo cukup untuk penarikan
+	// Periksa apakah saldo cukup untuk penarikan
 	if account.Balance < amount {
-		log.Println("[ERROR] Saldo tidak cukup untuk penarikan:", account.Balance)
-		return 0, errors.New("saldo tidak cukup untuk penarikan")
+		message := "Saldo tidak cukup untuk penarikan"
+		logData := map[string]interface{}{
+			"accountNo":      accountNo,
+			"currentBalance": account.Balance,
+			"withdrawAmount": amount,
+		}
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "CRITICAL", logData)
+		return 0, errors.New(message)
 	}
 
-	// Update saldo rekening
+	// Kurangi saldo rekening
 	account.Balance -= amount
 	if err := db.DB.Save(&account).Error; err != nil {
-		log.Println("[ERROR] Gagal memperbarui saldo:", err)
-		return 0, errors.New("gagal melakukan penarikan")
+		message := "Gagal memperbarui saldo rekening"
+		logData := map[string]interface{}{
+			"accountNo": accountNo,
+			"error":     err.Error(),
+		}
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "ERROR", logData)
+		return 0, errors.New(message)
 	}
 
 	// Simpan transaksi penarikan
@@ -42,8 +78,14 @@ func WithdrawService(accountNo string, amount float64) (float64, error) {
 		Amount:    amount,
 	}
 	if err := db.DB.Create(&transaction).Error; err != nil {
-		log.Println("[ERROR] Gagal menyimpan transaksi penarikan:", err)
-		return 0, errors.New("gagal menyimpan transaksi")
+		message := "Gagal mencatat transaksi penarikan"
+		logData := map[string]interface{}{
+			"accountNo": accountNo,
+			"error":     err.Error(),
+		}
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "ERROR", logData)
+		return 0, errors.New(message)
 	}
 
 	// Simpan log audit
@@ -55,10 +97,24 @@ func WithdrawService(accountNo string, amount float64) (float64, error) {
 		BalanceAfter:  account.Balance,
 	}
 	if err := db.DB.Create(&auditLog).Error; err != nil {
-		log.Println("[ERROR] Gagal menyimpan audit log:", err)
-		return 0, errors.New("gagal menyimpan audit log")
+		message := "Gagal mencatat audit log"
+		logData := map[string]interface{}{
+			"accountNo": accountNo,
+			"error":     err.Error(),
+		}
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "ERROR", logData)
+		return 0, errors.New(message)
 	}
 
-	log.Println("[INFO] Penarikan berhasil, saldo sekarang:", account.Balance)
+	// Logging sukses
+	message := "Penarikan berhasil"
+	logData := map[string]interface{}{
+		"accountNo":      accountNo,
+		"finalBalance":   account.Balance,
+		"withdrawAmount": amount,
+	}
+	logs.StoreLogEntry(accountNo, message, "INFO", logData)
+
 	return account.Balance, nil
 }

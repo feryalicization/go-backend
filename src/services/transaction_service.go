@@ -3,9 +3,10 @@ package services
 import (
 	"errors"
 	"go-backend/db"
+	"go-backend/logs"
 	"go-backend/src/models"
-	"log"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -13,8 +14,13 @@ import (
 func DepositService(accountNo string, amount float64) (float64, error) {
 	// Validasi jumlah deposit
 	if amount <= 0 {
-		log.Println("[ERROR] Jumlah deposit harus lebih dari 0")
-		return 0, errors.New("jumlah deposit harus lebih dari 0")
+		message := "Jumlah deposit harus lebih dari 0"
+		logData := logrus.Fields{"account_no": accountNo, "amount": amount}
+
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "WARNING", logData)
+
+		return 0, errors.New(message)
 	}
 
 	var account models.Account
@@ -22,10 +28,21 @@ func DepositService(accountNo string, amount float64) (float64, error) {
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Println("[ERROR] Akun tidak ditemukan atau bukan jenis 'savings'")
-			return 0, errors.New("akun tidak ditemukan atau bukan jenis 'savings'")
+			message := "Akun tidak ditemukan atau bukan jenis 'savings'"
+			logData := logrus.Fields{"account_no": accountNo}
+
+			logs.LogError(accountNo, message, logData)
+			logs.StoreLogEntry(accountNo, message, "WARNING", logData)
+
+			return 0, errors.New(message)
 		}
-		log.Println("[ERROR] Database error:", err)
+
+		message := "Database error saat mencari akun"
+		logData := logrus.Fields{"account_no": accountNo, "error": err.Error()}
+
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "ERROR", logData)
+
 		return 0, errors.New("terjadi kesalahan pada database")
 	}
 
@@ -34,8 +51,13 @@ func DepositService(accountNo string, amount float64) (float64, error) {
 
 	// Simpan perubahan saldo
 	if err := db.DB.Save(&account).Error; err != nil {
-		log.Println("[ERROR] Gagal memperbarui saldo akun:", err)
-		return 0, errors.New("gagal memperbarui saldo akun")
+		message := "Gagal memperbarui saldo akun"
+		logData := logrus.Fields{"account_no": accountNo, "amount": amount, "error": err.Error()}
+
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "ERROR", logData)
+
+		return 0, errors.New(message)
 	}
 
 	// Catat transaksi di tabel `transactions`
@@ -46,8 +68,13 @@ func DepositService(accountNo string, amount float64) (float64, error) {
 	}
 
 	if err := db.DB.Create(&transaction).Error; err != nil {
-		log.Println("[ERROR] Gagal mencatat transaksi:", err)
-		return 0, errors.New("gagal mencatat transaksi")
+		message := "Gagal mencatat transaksi"
+		logData := logrus.Fields{"account_no": accountNo, "amount": amount, "error": err.Error()}
+
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "ERROR", logData)
+
+		return 0, errors.New(message)
 	}
 
 	// Catat audit log
@@ -60,10 +87,25 @@ func DepositService(accountNo string, amount float64) (float64, error) {
 	}
 
 	if err := db.DB.Create(&auditLog).Error; err != nil {
-		log.Println("[ERROR] Gagal mencatat audit log:", err)
-		return 0, errors.New("gagal mencatat audit log")
+		message := "Gagal mencatat audit log"
+		logData := logrus.Fields{"account_no": accountNo, "amount": amount, "balance_after": account.Balance, "error": err.Error()}
+
+		logs.LogError(accountNo, message, logData)
+		logs.StoreLogEntry(accountNo, message, "ERROR", logData)
+
+		return 0, errors.New(message)
 	}
 
-	log.Printf("[INFO] Deposit berhasil. No Rekening: %s, Saldo Akhir: %.2f\n", accountNo, account.Balance)
+	// Log sukses
+	message := "Deposit berhasil"
+	logData := logrus.Fields{
+		"account_no":    accountNo,
+		"amount":        amount,
+		"balance_after": account.Balance,
+	}
+
+	logs.LogInfo(accountNo, message, logData)
+	logs.StoreLogEntry(accountNo, message, "INFO", logData)
+
 	return account.Balance, nil
 }

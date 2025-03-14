@@ -2,7 +2,7 @@ package main
 
 import (
 	"go-backend/db"
-	"go-backend/src/handlers/routes" // Import DTO untuk validasi
+	"go-backend/src/handlers/routes"
 	"log"
 
 	_ "go-backend/docs"

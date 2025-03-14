@@ -3,9 +3,10 @@ package services
 import (
 	"errors"
 	"go-backend/db"
+	"go-backend/logs"
 	"go-backend/src/models"
-	"log"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -15,13 +16,38 @@ func GetSaldoService(accountNo string) (float64, error) {
 	err := db.DB.Where("account_no = ? AND account_type = ?", accountNo, models.Savings).First(&account).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Println("[ERROR] No rekening tidak ditemukan atau bukan akun tabungan:", accountNo)
-			return 0, errors.New("no rekening tidak ditemukan atau bukan akun tabungan")
+			message := "Akun tidak ditemukan atau bukan tabungan"
+			logData := logrus.Fields{"account_no": accountNo}
+
+			// Log to service
+			logs.LogError(accountNo, message, logData)
+
+			// Store in database
+			logs.StoreLogEntry(accountNo, message, "WARNING", logData)
+
+			return 0, errors.New(message)
 		}
-		log.Println("[ERROR] Database query error:", err)
-		return 0, errors.New("terjadi kesalahan database")
+
+		message := "Kesalahan saat mengambil data akun"
+		logData := logrus.Fields{"account_no": accountNo, "error": err.Error()}
+
+		// Log to service
+		logs.LogError(accountNo, message, logData)
+
+		// Store in database
+		logs.StoreLogEntry(accountNo, message, "ERROR", logData)
+
+		return 0, errors.New("terjadi kesalahan pada sistem")
 	}
 
-	log.Println("[INFO] Saldo ditemukan untuk no rekening:", accountNo, "Saldo:", account.Balance)
+	message := "Saldo ditemukan"
+	logData := logrus.Fields{"account_no": accountNo, "balance": account.Balance}
+
+	// Log to service
+	logs.LogInfo(accountNo, message, logData)
+
+	// Store in database
+	logs.StoreLogEntry(accountNo, message, "INFO", logData)
+
 	return account.Balance, nil
 }
