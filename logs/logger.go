@@ -14,12 +14,11 @@ var Logger = logrus.New()
 
 func init() {
 	// Konfigurasi logger
-	Logger.SetFormatter(&logrus.JSONFormatter{}) // Format log ke JSON
-	Logger.SetOutput(os.Stdout)                  // Output log ke terminal
-	Logger.SetLevel(logrus.InfoLevel)            // Level default INFO
+	Logger.SetFormatter(&logrus.JSONFormatter{})
+	Logger.SetOutput(os.Stdout)
+	Logger.SetLevel(logrus.InfoLevel)
 }
 
-// LogInfo hanya mencetak log ke service (tidak menyimpan ke DB)
 func LogInfo(accountNo, message string, fields logrus.Fields) {
 	if fields == nil {
 		fields = logrus.Fields{}
@@ -31,7 +30,6 @@ func LogInfo(accountNo, message string, fields logrus.Fields) {
 	Logger.WithFields(fields).Info(message)
 }
 
-// LogError hanya mencetak log ke service (tidak menyimpan ke DB)
 func LogError(accountNo, message string, fields logrus.Fields) {
 	if fields == nil {
 		fields = logrus.Fields{}
@@ -43,9 +41,7 @@ func LogError(accountNo, message string, fields logrus.Fields) {
 	Logger.WithFields(fields).Error(message)
 }
 
-// storeLogEntry menyimpan log ke database secara terpisah
 func StoreLogEntry(accountNo, message, logType string, fields logrus.Fields) {
-	// Konversi fields menjadi JSON
 	detailsJSON, _ := json.Marshal(fields)
 
 	logEntry := models.LogEntry{
@@ -55,7 +51,6 @@ func StoreLogEntry(accountNo, message, logType string, fields logrus.Fields) {
 		Details:   string(detailsJSON),
 	}
 
-	// Simpan ke database
 	if err := db.DB.Create(&logEntry).Error; err != nil {
 		Logger.WithFields(logrus.Fields{"error": err.Error()}).Error("Gagal menyimpan log ke database")
 	}
